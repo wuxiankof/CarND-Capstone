@@ -55,7 +55,13 @@ class TLDetector(object):
         self.waypoints_2d = []
         self.waypoint_tree = None
 
-        rospy.spin()
+        # rospy.spin()
+        self.loop()
+
+    def loop(self):
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            rate.sleep()
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -99,42 +105,6 @@ class TLDetector(object):
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
 
-    def get_closest_waypoint(self, x, y):
-        """Identifies the closest path waypoint to the given position
-            https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
-        Args:
-            pose (Pose): position to match a waypoint to
-
-        Returns:
-            int: index of the closest waypoint in self.waypoints
-
-        """
-        #TODO implement
-        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
-        return 0
-
-    def get_light_state(self, light):
-        """Determines the current color of the traffic light
-
-        Args:
-            light (TrafficLight): light to classify
-
-        Returns:
-            int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-
-        """
-        # testing, since the simulator already come with the light state
-        return light.state
-
-        if(not self.has_image):
-            self.prev_light_loc = None
-            return False
-
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
-        #Get classification
-        return self.light_classifier.get_classification(cv_image)
-
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
             location and color
@@ -173,6 +143,46 @@ class TLDetector(object):
         
         # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
+
+    def get_closest_waypoint(self, x, y):
+        """Identifies the closest path waypoint to the given position
+            https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
+        Args:
+            pose (Pose): position to match a waypoint to
+
+        Returns:
+            int: index of the closest waypoint in self.waypoints
+
+        """
+        #TODO implement
+        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
+
+        return closest_idx
+
+    def get_light_state(self, light):
+        """Determines the current color of the traffic light
+
+        Args:
+            light (TrafficLight): light to classify
+
+        Returns:
+            int: ID of traffic light color (specified in styx_msgs/TrafficLight)
+
+        """
+        # testing, since the simulator already come with the light state
+        
+        return light.state
+
+        if(not self.has_image):
+            self.prev_light_loc = None
+            return False
+
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+        #Get classification
+        return self.light_classifier.get_classification(cv_image)
+
+    
 
 if __name__ == '__main__':
     try:
