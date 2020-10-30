@@ -13,8 +13,10 @@ import yaml
 
 from scipy.spatial import KDTree
 import numpy as np
+import os
 
 STATE_COUNT_THRESHOLD = 3
+DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 class TLDetector(object):
     def __init__(self):
@@ -54,12 +56,14 @@ class TLDetector(object):
 
         self.waypoints_2d = []
         self.waypoint_tree = None
+        
+        self.Image_idx = 0
 
         # rospy.spin()
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(50)
+        rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             rate.sleep()
 
@@ -86,6 +90,10 @@ class TLDetector(object):
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
+
+        # save Image
+        cv2.imwrite('Image_' + str(self.Image_idx) + '.jpg', self.camera_image)
+        self.Image_idx += 1
 
         '''
         Publish upcoming red lights at camera frequency.
