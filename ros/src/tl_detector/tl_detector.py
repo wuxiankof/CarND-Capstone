@@ -15,7 +15,7 @@ from scipy.spatial import KDTree
 import numpy as np
 import os
 
-STATE_COUNT_THRESHOLD = 3
+STATE_COUNT_THRESHOLD = 1
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 class TLDetector(object):
@@ -26,6 +26,19 @@ class TLDetector(object):
         self.waypoints = None
         self.camera_image = None
         self.lights = []
+        
+        self.waypoints_2d = None
+        self.waypoint_tree = None
+        self.Image_idx = 0
+        
+        self.bridge = CvBridge()
+        self.light_classifier = TLClassifier()
+        self.listener = tf.TransformListener()
+
+        self.state = TrafficLight.UNKNOWN
+        self.last_state = TrafficLight.UNKNOWN
+        self.last_wp = -1
+        self.state_count = 0
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -44,20 +57,6 @@ class TLDetector(object):
         self.config = yaml.load(config_string)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
-
-        self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
-        self.listener = tf.TransformListener()
-
-        self.state = TrafficLight.UNKNOWN
-        self.last_state = TrafficLight.UNKNOWN
-        self.last_wp = -1
-        self.state_count = 0
-
-        self.waypoints_2d = []
-        self.waypoint_tree = None
-        
-        self.Image_idx = 0
 
         # rospy.spin()
         self.loop()
@@ -87,13 +86,18 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
+        self.Image_idx += 1
+        if self.Image_idx % 3 != 0:
+            return
+    
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
-
-        # save Image
-        cv2.imwrite('Image_' + str(self.Image_idx) + '.jpg', self.camera_image)
-        self.Image_idx += 1
+        
+        '''
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        cv2.imwrite(DIR_PATH + '/Images/Image_' + str(self.Image_idx) + '_' + str(state)+ '.jpg', cv_image)
+        '''
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -151,7 +155,7 @@ class TLDetector(object):
         
         # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
-
+    
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
@@ -164,7 +168,7 @@ class TLDetector(object):
         """
         #TODO implement
         closest_idx = self.waypoint_tree.query([x, y], 1)[1]
-
+        
         return closest_idx
 
     def get_light_state(self, light):
@@ -178,7 +182,6 @@ class TLDetector(object):
 
         """
         # testing, since the simulator already come with the light state
-        
         return light.state
 
         if(not self.has_image):
@@ -188,9 +191,10 @@ class TLDetector(object):
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         #Get classification
-        return self.light_classifier.get_classification(cv_image)
-
-    
+        light = self.light_classifier.get_classification(cv_image)
+        rospy.logwarn(str(light))
+        
+        return light
 
 if __name__ == '__main__':
     try:

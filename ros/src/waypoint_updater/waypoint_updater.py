@@ -6,6 +6,7 @@ from styx_msgs.msg import Lane, Waypoint
 
 import math
 
+from std_msgs.msg import Int32
 from scipy.spatial import KDTree
 import numpy as np
 
@@ -25,7 +26,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-
+MAX_DECEL = .5
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -33,19 +34,19 @@ class WaypointUpdater(object):
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        rospy.Subscriber('/traffic_waypoints', Lane, self.traffic_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
-
+        
         self.pose = None
         self.base_waypoints = None
-        self.waypoints_2d = []
+        self.waypoints_2d = None
         self.waypoint_tree = None
-        self.stopline_wp_idx = None
+        self.stopline_wp_idx = -1
 
         # rospy.spin()
         self.loop()
@@ -53,7 +54,7 @@ class WaypointUpdater(object):
     def loop(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            if self.pose and self.base_waypoints:
+            if self.pose and self.base_waypoints and self.waypoint_tree:
                 # get closest waypoint
                 # closest_waypoint_idx = self.get_closest_waypoint_idx()
                 self.publish_waypoints()
@@ -98,12 +99,6 @@ class WaypointUpdater(object):
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
 
         return closest_idx
-
-#    def publish_waypoints(self, closest_idx):
-#       lane = Lane()
-#       lane.header = self.base_waypoints.header
-#       lane.waypoints = self.base_waypoints.waypoints[closest_idx: closest_idx + LOOKAHEAD_WPS]
-#       self.final_waypoints_pub.publish(lane)
     
     def publish_waypoints(self):
         final_lane = self.generate_lane()
@@ -111,10 +106,13 @@ class WaypointUpdater(object):
 
     def generate_lane(self):
         lane = Lane()
+        # lane.header = self.base_waypoints.header
+        
+        # rospy.logwarn('self.stopline_wp_idx = %s', self.stopline_wp_idx)
 
         closest_idx = self.get_closest_waypoint_idx()
         farthest_idx = closest_idx + LOOKAHEAD_WPS
-        base_waypoints = self.base_waypoints[closest_idx:farthest_idx]
+        base_waypoints = self.base_waypoints.waypoints[closest_idx : farthest_idx]
 
         if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
             lane.waypoints = base_waypoints
